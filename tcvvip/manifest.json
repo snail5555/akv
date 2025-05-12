@@ -1,0 +1,78 @@
+{
+  "name": "TCVVIP",
+  "short_name": "TCVVIP",
+  "description": "TCVVIP - Cổng game quốc tế",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f8ff",
+  "theme_color": "#fd5a11",
+  "prefer_related_applications": false,
+  "categories": ["games", "entertainment"],
+  "screenshots": [
+    {
+      "src": "/images/IconLogoVuông.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "platform": "narrow",
+      "label": "TCVVIP Logo"
+    }
+  ],
+  "icons": [
+    {
+      "src": "/images/IconLogoVuông.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable",
+      "platform": "ios"
+    },
+    {
+      "src": "/images/IconLogoVuông.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable",
+      "platform": "ios"
+    },
+    {
+      "src": "/images/IconLogoVuông.png",
+      "sizes": "120x120",
+      "type": "image/png",
+      "purpose": "any maskable",
+      "platform": "ios"
+    },
+    {
+      "src": "/images/IconLogoVuông.png",
+      "sizes": "76x76",
+      "type": "image/png",
+      "purpose": "any maskable",
+      "platform": "ios"
+    },
+    {
+      "src": "/images/IconLogoVuông.png",
+      "sizes": "60x60",
+      "type": "image/png",
+      "purpose": "any maskable",
+      "platform": "ios"
+    },
+    {
+      "src": "/images/IconLogoVuông.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/IconLogoVuông.png",
+      "sizes": "16x16",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "background_fetch": {
+    "url_patterns": ["*/api/game/*"]
+  },
+  "permissions": ["background"],
+  "serviceworker": {
+    "src": "/sw.js",
+    "scope": "/"
+  }
+}
