@@ -18,12 +18,14 @@ jobs:
         id: changed-files
         run: |
           files=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -E '\.(png|jpg|jpeg|webp|gif|svg|js|css|json)$' || true)
-          echo "files=$files" >> "$GITHUB_OUTPUT"
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$files" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Purge updated files from JSDelivr
         if: ${{ steps.changed-files.outputs.files != '' }}
         run: |
-          for file in ${{ steps.changed-files.outputs.files }}; do
+          echo "${{ steps.changed-files.outputs.files }}" | while read file; do
             echo "Purging: $file"
             curl -X GET "https://purge.jsdelivr.net/gh/snail5555/akv@main/$file"
           done
