@@ -13,19 +13,25 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Get list of updated image files
         id: changed-files
         run: |
           files=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -E '\.(png|jpg|jpeg|webp|gif|svg|js|css|json)$' || true)
-          echo "files<<EOF" >> $GITHUB_OUTPUT
-          echo "$files" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          if [ -n "$files" ]; then
+            echo "files_json=$(echo "$files" | jq -R -s -c 'split("\n")[:-1]')" >> $GITHUB_OUTPUT
+          else
+            echo "files_json=[]" >> $GITHUB_OUTPUT
+          fi
 
       - name: Purge updated files from JSDelivr
-        if: ${{ steps.changed-files.outputs.files != '' }}
+        if: ${{ steps.changed-files.outputs.files_json != '[]' }}
         run: |
-          echo "${{ steps.changed-files.outputs.files }}" | while read file; do
-            echo "Purging: $file"
-            curl -X GET "https://purge.jsdelivr.net/gh/snail5555/akv@main/$file"
+          echo "${{ steps.changed-files.outputs.files_json }}" | jq -r '.[]' | while read file; do
+            if [ -n "$file" ]; then
+              echo "Purging: $file"
+              curl -X GET "https://purge.jsdelivr.net/gh/snail5555/akv@main/$file"
+            fi
           done
