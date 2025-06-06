@@ -1,4 +1,4 @@
-name: Auto Purge JSDelivr for Updated Images (All Repo)
+name: Auto Purge JSDelivr for Updated Files
 
 on:
   push:
@@ -14,24 +14,91 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 2 # Chỉ cần 2 commits để so sánh
 
-      - name: Get list of updated image files
+      - name: Get list of updated files
         id: changed-files
         run: |
-          files=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -E '\.(png|jpg|jpeg|webp|gif|svg|js|css|json)$' || true)
-          if [ -n "$files" ]; then
-            echo "files_json=$(echo "$files" | jq -R -s -c 'split("\n")[:-1]')" >> $GITHUB_OUTPUT
+          # Lấy danh sách files thay đổi
+          if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            files=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -E '\.(png|jpg|jpeg|webp|gif|svg|js|css|json|ico|woff|woff2|ttf)$' || true)
           else
-            echo "files_json=[]" >> $GITHUB_OUTPUT
+            # Trường hợp push đầu tiên
+            files=$(git diff --name-only HEAD~1 HEAD | grep -E '\.(png|jpg|jpeg|webp|gif|svg|js|css|json|ico|woff|woff2|ttf)$' || true)
           fi
 
-      - name: Purge updated files from JSDelivr
-        if: ${{ steps.changed-files.outputs.files_json != '[]' }}
+          echo "Changed files:"
+          echo "$files"
+
+          if [ -n "$files" ]; then
+            # Tạo array JSON
+            files_array=$(echo "$files" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            echo "files_json=$files_array" >> $GITHUB_OUTPUT
+            echo "has_files=true" >> $GITHUB_OUTPUT
+          else
+            echo "files_json=[]" >> $GITHUB_OUTPUT
+            echo "has_files=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Purge files from JSDelivr CDN
+        if: steps.changed-files.outputs.has_files == 'true'
         run: |
-          echo "${{ steps.changed-files.outputs.files_json }}" | jq -r '.[]' | while read file; do
+          echo "Starting JSDelivr purge process..."
+          files='${{ steps.changed-files.outputs.files_json }}'
+
+          echo "$files" | jq -r '.[]' | while IFS= read -r file; do
             if [ -n "$file" ]; then
-              echo "Purging: $file"
-              curl -X GET "https://purge.jsdelivr.net/gh/snail5555/akv@main/$file"
+              # URL encode file path nếu cần
+              encoded_file=$(echo "$file" | sed 's/ /%20/g')
+              purge_url="https://purge.jsdelivr.net/gh/${{ github.repository }}@main/$encoded_file"
+              
+              echo "🔄 Purging: $file"
+              echo "📡 URL: $purge_url"
+              
+              # Gửi request purge với retry
+              for attempt in 1 2 3; do
+                response=$(curl -s -w "\n%{http_code}" -X POST "$purge_url" || echo -e "\nERROR")
+                http_code=$(echo "$response" | tail -n1)
+                response_body=$(echo "$response" | head -n -1)
+                
+                if [ "$http_code" = "200" ] || [ "$http_code" = "202" ]; then
+                  echo "✅ Success: $file (HTTP $http_code)"
+                  echo "📝 Response: $response_body"
+                  break
+                else
+                  echo "❌ Failed attempt $attempt: $file (HTTP $http_code)"
+                  echo "📝 Response: $response_body"
+                  if [ $attempt -lt 3 ]; then
+                    echo "⏳ Retrying in 2 seconds..."
+                    sleep 2
+                  fi
+                fi
+              done
+              
+              # Thêm delay giữa các request
+              sleep 1
+            fi
+          done
+
+          echo "🎉 Purge process completed!"
+
+      - name: Verify purge (optional)
+        if: steps.changed-files.outputs.has_files == 'true'
+        run: |
+          echo "⏳ Waiting 10 seconds for CDN to update..."
+          sleep 10
+
+          files='${{ steps.changed-files.outputs.files_json }}'
+          echo "$files" | jq -r '.[]' | head -3 | while IFS= read -r file; do
+            if [ -n "$file" ]; then
+              cdn_url="https://cdn.jsdelivr.net/gh/${{ github.repository }}@main/$file"
+              echo "🔍 Checking: $cdn_url"
+              
+              response=$(curl -s -I "$cdn_url" || echo "ERROR")
+              if echo "$response" | grep -q "200 OK"; then
+                echo "✅ File accessible on CDN: $file"
+              else
+                echo "⚠️ File may still be updating: $file"
+              fi
             fi
           done
